@@ -1,0 +1,31 @@
+{
+  "name": "macrossz-skills",
+  "owner": {
+    "name": "macrossz",
+    "email": ""
+  },
+  "metadata": {
+    "description": "A personal collection of Claude Code skills",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "hive-doris-sql-transformation",
+      "description": "将 Hive HQL 文件转换为 Apache Doris SQL 文件，支持单文件和批量处理",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./hive-doris-sql-transformation"
+      ]
+    },
+    {
+      "name": "start-project",
+      "description": "启动新项目规划流程，对用户进行深度需求访谈后生成完整规范文档",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./start-project"
+      ]
+    }
+  ]
+}
