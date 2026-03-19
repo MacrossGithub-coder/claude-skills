@@ -11,7 +11,7 @@ Add to your `~/.claude/settings.json`:
   "macrossz-skills": {
     "source": {
       "source": "github",
-      "repo": "macrossz/claude-skills"
+      "repo": "MacrossGithub-coder/claude-skills"
     }
   }
 }
