@@ -1,1 +1,11 @@
 .DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Skill runtime artefacts
+backtrader-multi/.venv/
+backtrader-multi/project/output/
+output/

@@ -1,0 +1,7 @@
+yfinance>=0.2.40,<2
+backtrader>=1.9.78
+quantstats>=0.0.81
+pandas>=2.0
+numpy
+matplotlib
+PyYAML

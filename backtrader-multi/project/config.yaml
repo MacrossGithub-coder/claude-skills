@@ -1,0 +1,52 @@
+backtest:
+  start: '2026-01-01'
+  end: '2026-05-01'
+  cash: 10000000
+  commission: 0.001
+  signal_threshold: 0.5
+logging:
+  level: INFO
+  to_file: true
+random:
+  seed: 42
+  n_combos: 3
+strategy_pool:
+- name: MaRsiStrategy_Slow
+  class: MaRsiStrategy
+  weight: 0.6
+  params:
+    ma_short: 20
+    ma_long: 60
+    rsi_period: 14
+    rsi_buy: 30
+    rsi_sell: 70
+    open_condition: or
+    risk_ratio: 0.6
+    max_pos_ratio: 0.85
+    show_plot: false
+- name: MaRsiStrategy_Fast
+  class: MaRsiStrategy
+  weight: 0.4
+  params:
+    ma_short: 10
+    ma_long: 30
+    rsi_period: 14
+    rsi_buy: 35
+    rsi_sell: 65
+    open_condition: or
+    risk_ratio: 0.7
+    max_pos_ratio: 0.9
+    show_plot: false
+- name: MaRsiStrategy_Aggressive
+  class: MaRsiStrategy
+  weight: 0.3
+  params:
+    ma_short: 5
+    ma_long: 20
+    rsi_period: 10
+    rsi_buy: 40
+    rsi_sell: 60
+    open_condition: or
+    risk_ratio: 0.8
+    max_pos_ratio: 0.95
+    show_plot: false
