@@ -7,7 +7,7 @@
 set -euo pipefail
 
 if [[ $# -lt 3 ]]; then
-  echo "Usage: bash run.sh <TICKER> <START> <END>" >&2
+  echo "Usage: bash run.sh <TICKER> <START> <END> [--config <path>]" >&2
   exit 64
 fi
 
@@ -15,11 +15,36 @@ TICKER_RAW="$1"
 START="$2"
 END="$3"
 TICKER="$(echo "$TICKER_RAW" | tr '[:lower:]' '[:upper:]')"
+shift 3
+
+CONFIG_FILE=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --config)
+      if [[ $# -lt 2 ]]; then
+        echo "[backtrader-multi] --config requires a path argument" >&2
+        exit 64
+      fi
+      CONFIG_FILE="$2"
+      shift 2
+      ;;
+    *)
+      echo "[backtrader-multi] unknown argument: $1" >&2
+      exit 64
+      ;;
+  esac
+done
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_DIR="$SKILL_DIR/project"
 VENV_DIR="$SKILL_DIR/.venv"
 REQS="$SKILL_DIR/requirements.txt"
+DEFAULT_CONFIG="$PROJECT_DIR/config.yaml"
+CONFIG_FILE="${CONFIG_FILE:-$DEFAULT_CONFIG}"
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  echo "[backtrader-multi] config file not found: $CONFIG_FILE" >&2
+  exit 66
+fi
 
 CALLER_CWD="$(pwd)"
 TARGET_DIR="$CALLER_CWD/output/$TICKER"
@@ -53,7 +78,7 @@ BUNDLED_OUTPUT="$PROJECT_DIR/output/$TICKER"
 
 set +e
 "$PYBIN" "$PROJECT_DIR/run_backtest.py" \
-  --config "$PROJECT_DIR/config.yaml" \
+  --config "$CONFIG_FILE" \
   --ticker "$TICKER" \
   --start "$START" \
   --end "$END"
@@ -84,6 +109,25 @@ fi
 
 if [[ $MOVED -gt 0 ]]; then
   echo "[backtrader-multi] Relocated $MOVED artefact(s) to $TARGET_DIR" >&2
+fi
+
+# ------------------------------------------------------------------
+# Override-config disposition
+#   Success path: archive the staged config alongside the run's
+#     artefacts as <RUN_DATE>_config.yaml, then remove the /tmp file.
+#   Failure / no-output path: leave the staged file in place and emit
+#     STAGED_CONFIG=<path> on stderr so the caller can inspect what
+#     was actually attempted.
+# ------------------------------------------------------------------
+if [[ "$CONFIG_FILE" != "$DEFAULT_CONFIG" ]]; then
+  if [[ $RC -eq 0 && $MOVED -gt 0 ]]; then
+    cp "$CONFIG_FILE" "$TARGET_DIR/${TODAY}_config.yaml"
+    rm -f "$CONFIG_FILE"
+    echo "[backtrader-multi] Archived effective config to $TARGET_DIR/${TODAY}_config.yaml" >&2
+  else
+    echo "STAGED_CONFIG=$CONFIG_FILE" >&2
+    echo "[backtrader-multi] Override config preserved at $CONFIG_FILE (run did not complete cleanly)" >&2
+  fi
 fi
 
 if [[ $RC -ne 0 ]]; then

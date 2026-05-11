@@ -53,12 +53,41 @@ fi
 
 The user-level path check is an O(1) stat — when it hits (typical case) we skip the `find` entirely. The `find` fallback covers both marketplace-root and `skills/`-nested layouts in a single pass, capped at depth 8 to stay fast on systems with many installed plugins. All subsequent commands reference `$SKILL_DIR/...`.
 
+### Step 0.5 — Detect natural-language parameter overrides
+
+Before invoking `run.sh`, scan the user's request for parameter tweaks **beyond** ticker / start / end. These are common patterns (any language) — the list is illustrative, not exhaustive:
+
+- 现金 / cash — "用 500 万现金"、"start with $5M cash"、"cash=5000000"
+- 单条策略参数 — "把 Aggressive 的 ma_short 改成 3"、"set RSI buy threshold to 25 / sell to 75"
+- 随机种子 / 组合数 — "seed 改成 7"、"只跑 1 个 combo"
+- 加 / 减 / 换策略 — "加一个 RSI 7/93 的激进策略"、"只跑 Slow"、"换成 RSI-only 池"
+- 手续费 / 信号阈值 — "佣金按 0.0005"、"signal_threshold 0.7"
+
+If any are detected:
+
+1. Read `$SKILL_DIR/project/config.yaml` to get the current defaults.
+2. In your head, deep-merge the requested overrides on top of the defaults:
+   - Scalar / nested-dict fields → overwrite leaf values (e.g. `backtest.cash`, `random.seed`)
+   - `strategy_pool` (list): match existing entries by `name` and merge their `params`; append new entries; omit removed ones
+3. Write the **complete merged config** (not just the diff) to `/tmp/btm-<short-uuid>.yaml` using the Write tool. Pick a short hex suffix so concurrent runs don't collide.
+4. Pass the path to `run.sh` via `--config`:
+
+   ```bash
+   bash "$SKILL_DIR/scripts/run.sh" <TICKER> <START> <END> --config /tmp/btm-<short-uuid>.yaml
+   ```
+
+If no overrides are detected, **skip this step entirely** — `run.sh` falls back to the bundled `config.yaml` automatically.
+
+**After the run:**
+- On success, `run.sh` archives the staged config as `<CWD>/output/<TICKER>/<RUN_DATE>_config.yaml` alongside the other artefacts and removes the `/tmp` file. Mention this in your final report ("effective config archived as `<RUN_DATE>_config.yaml` for reproducibility") so the user knows where to look.
+- On failure, `run.sh` leaves the `/tmp` file in place and prints `STAGED_CONFIG=<path>` on stderr. Surface that path verbatim to the user — it tells them exactly which params produced the failure.
+
 ### Step 1 — Run the backtest
 
-From the user's current working directory, invoke the bundled wrapper:
+From the user's current working directory, invoke the bundled wrapper (omit `--config` when there are no overrides; see Step 0.5):
 
 ```bash
-bash "$SKILL_DIR/scripts/run.sh" <TICKER> <START> <END>
+bash "$SKILL_DIR/scripts/run.sh" <TICKER> <START> <END> [--config <path>]
 ```
 
 The first invocation creates `$SKILL_DIR/.venv/` and pip-installs `yfinance / backtrader / quantstats / pandas / matplotlib / PyYAML`. Expect 1–2 minutes of wait on the first run; subsequent runs reuse the venv and start instantly.
@@ -116,19 +145,23 @@ Save **three** outputs:
 
 ## Modifying parameters other than ticker / start / end
 
-The CLI shorthand only accepts those three. Everything else (random `seed`, `n_combos`, the strategy pool, `cash`, `commission`) lives in the bundled `config.yaml`. To change them, edit:
+Two paths, choose by intent:
+
+**Per-run override (default — preferred).** Use the natural-language flow from **Step 0.5**: detect the override request, write a fully-merged config to `/tmp/btm-<uuid>.yaml`, pass it via `--config`. The base `config.yaml` stays untouched, the effective config is archived as `<RUN_DATE>_config.yaml` next to that run's artefacts, and the next default-config run is unaffected. This is the right choice for "试一下用 500 万", "compare seeds 1/2/3", "加一个更激进的策略看看", or any one-off experiment.
+
+**Persistent change.** When the user explicitly wants a tweak to become the new default for *every* future run ("以后都按这个跑" / "make this the default"), edit the base file directly:
 
 ```
 $SKILL_DIR/project/config.yaml
 ```
 
-(For the user's reference, expand `$SKILL_DIR` to the absolute path resolved in Step 0 before mentioning it — they will not have the variable set in their own shell.)
+(Expand `$SKILL_DIR` to the absolute path resolved in Step 0 before mentioning it to the user — they will not have the variable set in their own shell.)
 
-The change persists until edited again. Tell the user this is the location if they ask to tune anything beyond the three CLI args.
+The change persists until edited again. Only point users here when they explicitly ask for a permanent change; otherwise default to the per-run override path.
 
 ## Files in this skill (paths relative to `$SKILL_DIR`)
 
-- `scripts/run.sh` — venv bootstrap + wrapper around `run_backtest.py` + relocates output to caller's CWD
+- `scripts/run.sh` — venv bootstrap + wrapper around `run_backtest.py`; accepts `--config <path>` to override the default config; relocates output to caller's CWD; on success archives any non-default override config alongside the artefacts as `<RUN_DATE>_config.yaml` and removes the staged file (`/tmp` file is preserved on failure with `STAGED_CONFIG=` printed to stderr)
 - `scripts/analyze_results.py` — parses `<RUN_DATE>_run.log` + `<RUN_DATE>_trades.csv` into JSON
 - `project/` — verbatim copy of the multi-strategy engine; do not edit unless intentionally maintaining the strategy code
 - `requirements.txt` — pinned dependency list used by the venv bootstrap
