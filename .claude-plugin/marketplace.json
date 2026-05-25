@@ -19,15 +19,6 @@
       ]
     },
     {
-      "name": "start-project",
-      "description": "启动新项目规划流程，对用户进行深度需求访谈后生成完整规范文档",
-      "source": "./",
-      "strict": false,
-      "skills": [
-        "./start-project"
-      ]
-    },
-    {
       "name": "backtrader-multi",
       "description": "对单只股票运行多策略量化回测，并生成中英双语的可分享分析报告",
       "source": "./",
